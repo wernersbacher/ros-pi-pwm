@@ -1,14 +1,52 @@
 #!/usr/bin/python3
 
 import rospy
+import math
 #from std_msgs.msg import String
 from ros_pi_pwm.msg import command
 from rpi_hardware_pwm import HardwarePWM
 
-fPWM = 50  # Hz (not higher with software PWM)
+
+class PWMModule:
+    """ represents one pwm module"""
+
+    def __init__(self, pwm_channel):
+        self.current_duty = 0
+        self.current_freq = 0
+        self.stopped = True
+
+        self.pwm_channel = pwm_channel
+        self.pwm = None
+
+    def start(self):
+        self.pwm = HardwarePWM(pwm_channel=self.pwm_channel, hz=self.current_freq)
+        self.pwm.start(self.current_duty)
+
+    def update(self, freq, duty):
+
+        is_new_freq = not math.isclose(freq, self.current_freq)
+
+        self.current_duty = duty
+        # if new frequencies differs, update the value, but don't apply yet
+        if is_new_freq:
+            self.current_freq = freq
+
+        # create pwm module if not started
+        if self.stopped:
+            self.start()
+            self.stopped = False
+        else:
+            self.pwm.change_duty_cycle(duty)
+            if not is_new_freq:
+                self.pwm.change_frequency(freq)
+
+    def stop(self):
+        self.stopped = True
+        self.pwm = None
 
 
 class PWM:
+    """ controls both rpi pwms"""
 
     def __init__(self):
         self.pwm0 = None
@@ -16,26 +54,24 @@ class PWM:
         self.setup()
 
     def setup(self):
-        self.pwm0 = HardwarePWM(pwm_channel=0, hz=fPWM)
-        self.pwm1 = HardwarePWM(pwm_channel=1, hz=fPWM)
-        self.pwm0.start(0)
-        self.pwm1.start(0)
+        self.pwm0 = PWMModule(pwm_channel=0)
+        self.pwm1 = PWMModule(pwm_channel=1)
 
-    def set_dc(self, pwm_num, duty):
-        """ todo: check types """
-        
+    def update(self, pwm_num, freq, duty):
         if pwm_num == 1:
-            self.pwm1.change_duty_cycle(duty)
+            pwm_module = self.pwm1
         else:
-            self.pwm0.change_duty_cycle(duty)
-                   
+            pwm_module = self.pwm0
+
+        pwm_module.update(freq, duty)
+        
 
 pwm = PWM()
 
+
 def callback(data):
-    rospy.loginfo(rospy.get_caller_id() + f"Servo num: {data.pwm_num}, DC = {data.duty}%")
-    pwm.set_dc(data.pwm_num, data.duty)
-    
+    rospy.loginfo(rospy.get_caller_id() + f"Servo num: {data.pwm_num}, Freq = {data.freq}, DC = {data.duty}%")
+    pwm.update(data.pwm_num, data.freq, data.duty)
 
     
 def listener():
