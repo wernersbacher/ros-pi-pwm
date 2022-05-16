@@ -3,8 +3,17 @@
 import rospy
 import math
 #from std_msgs.msg import String
-from ros_pi_pwm.msg import command
+from ros_pi_pwm.msg import PWMArray, PWM
 from rpi_hardware_pwm import HardwarePWM
+
+"""
+TODO: Ctrl+C fixen 
+
+"""
+
+"""
+rostopic pub pwm_listener ros_pi_pwm/PWMArray "{pwms:[{pwm_num:0, freq:50, duty:9}, {pwm_num:1, freq:50, duty:4.5}]}"
+"""
 
 
 class PWMModule:
@@ -45,7 +54,7 @@ class PWMModule:
         self.pwm = None
 
 
-class PWM:
+class PWMController:
     """ controls both rpi pwms"""
 
     def __init__(self):
@@ -66,12 +75,14 @@ class PWM:
         pwm_module.update(freq, duty)
         
 
-pwm = PWM()
+pwm_controller = PWMController()
 
 
 def callback(data):
-    rospy.loginfo(rospy.get_caller_id() + f"Servo num: {data.pwm_num}, Freq = {data.freq}, DC = {data.duty}%")
-    pwm.update(data.pwm_num, data.freq, data.duty)
+    print(data, type(data))
+    for p in data.pwms:
+        rospy.loginfo(rospy.get_caller_id() + f"Servo num: {p.pwm_num}, Freq = {p.freq}, DC = {p.duty}%")
+        pwm_controller.update(p.pwm_num, p.freq, p.duty)
 
     
 def listener():
@@ -83,7 +94,7 @@ def listener():
     # run simultaneously.
     rospy.init_node('pwm_pi_node', anonymous=True)
 
-    rospy.Subscriber("pwm_listener", command, callback)
+    rospy.Subscriber("pwm_listener", PWMArray, callback)
 
     # spin() simply keeps python from exiting until this node is stopped
     rospy.spin()
