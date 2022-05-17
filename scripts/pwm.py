@@ -4,16 +4,7 @@ import rospy
 import math
 #from std_msgs.msg import String
 from ros_pi_pwm.msg import PWMArray, PWM
-from rpi_hardware_pwm import HardwarePWM
-
-"""
-TODO: Ctrl+C fixen 
-
-"""
-
-"""
-rostopic pub pwm_listener ros_pi_pwm/PWMArray "{pwms:[{pwm_num:0, freq:50, duty:9}, {pwm_num:1, freq:50, duty:4.5}]}"
-"""
+from rpi_hardware_pwm import HardwarePWM, HardwarePWMException
 
 
 class PWMModule:
@@ -72,14 +63,18 @@ class PWMController:
         else:
             pwm_module = self.pwm0
 
-        pwm_module.update(freq, duty)
-        
+        try:
+            pwm_module.update(freq, duty)
+        except HardwarePWMException as e:
+            rospy.logerr("Wrong Hardware values were given!")
+            rospy.logerr(str(e))
+
 
 pwm_controller = PWMController()
 
 
 def callback(data):
-    print(data, type(data))
+    rospy.loginfo(data)
     for p in data.pwms:
         rospy.loginfo(rospy.get_caller_id() + f"Servo num: {p.pwm_num}, Freq = {p.freq}, DC = {p.duty}%")
         pwm_controller.update(p.pwm_num, p.freq, p.duty)
