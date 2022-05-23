@@ -6,6 +6,53 @@ import math
 from ros_pi_pwm.msg import PWMArray, PWM
 from rpi_hardware_pwm import HardwarePWM, HardwarePWMException
 
+import RPi.GPIO as GPIO
+
+P_SERVO = 12  # adapt to your wiring
+P_ENGINE = 33  # adapt to your wiring
+fPWM = 50
+
+"""
+TODO: Frequenz ändern bei softwarepwm, oder anderes modul nehmen
+"""
+
+class PWMSoftware:
+
+    def __init__(self):
+        self.pwm_steering = None
+        self.pwm_engine = None
+        self.setup()
+
+    def setup(self):
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(P_SERVO, GPIO.OUT)
+        GPIO.setup(P_ENGINE, GPIO.OUT)
+        self.pwm_steering = GPIO.PWM(P_SERVO, fPWM)
+        self.pwm_engine = GPIO.PWM(P_ENGINE, fPWM)
+        self.pwm_steering.start(7.5)
+        self.pwm_engine.start(7.5)
+
+
+    def update(self, pwm_num, freq, duty):
+        if pwm_num == 1:
+            rospy.loginfo(f"Setting engine pwm to {duty}%")
+            pwm_module = self.pwm_engine
+        else:
+            pwm_module = self.pwm_steering
+
+        try:
+            pwm_module.ChangeDutyCycle(duty)
+        except HardwarePWMException as e:
+            rospy.logerr("Wrong Hardware values were given!")
+            rospy.logerr(str(e))
+
+    def stop(self):
+        time.sleep(1)
+        self.pwm_steering.stop()
+        self.pwm_engine.stop()
+
+        GPIO.cleanup()
+
 
 class PWMModule:
     """ represents one pwm module"""
@@ -70,7 +117,8 @@ class PWMController:
             rospy.logerr(str(e))
 
 
-pwm_controller = PWMController()
+#pwm_controller = PWMController()
+pwm_controller = PWMSoftware()
 
 
 def callback(data):
@@ -91,6 +139,8 @@ def listener():
 
     rospy.Subscriber("pwm_listener", PWMArray, callback)
 
+    rospy.loginfo("Started PWM Node")
+    
     # spin() simply keeps python from exiting until this node is stopped
     rospy.spin()
     
