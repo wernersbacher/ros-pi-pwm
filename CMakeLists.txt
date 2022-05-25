@@ -167,7 +167,7 @@ include_directories(
 # )
 
 catkin_install_python(PROGRAMS 
-  scripts/controller.py
+  scripts/standalone.py
   scripts/pwm.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
