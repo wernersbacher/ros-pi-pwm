@@ -7,108 +7,7 @@ import rospy
 import math
 #from std_msgs.msg import String
 from ros_pi_pwm.msg import PWMArray, PWM
-#from rpi_hardware_pwm import HardwarePWM, HardwarePWMException
-
-
-class HardwarePWMException(Exception):
-    pass
-
-class HardwarePWM:
-
-    _duty_cycle: float
-    _hz: float
-    chippath: str = "/sys/class/pwm/pwmchip0"
-
-    def __init__(self, pwm_channel: int, hz: float) -> None:
-
-        if pwm_channel not in {0, 1}:
-            raise HardwarePWMException("Only channel 0 and 1 are available on the Rpi.")
-
-        self.pwm_channel = pwm_channel
-        self.pwm_dir = f"{self.chippath}/pwm{self.pwm_channel}"
-        self._duty_cycle = 0
-
-        if not self.is_overlay_loaded():
-            raise HardwarePWMException(
-                "Need to add 'dtoverlay=pwm-2chan' to /boot/config.txt and reboot"
-            )
-        if not self.is_export_writable():
-            raise HardwarePWMException(f"Need write access to files in '{self.chippath}'")
-        if not self.does_pwmX_exists():
-            print("pwm does not exist yet, creating.")
-            self.create_pwmX()
-
-        while True:
-            try:
-                self.change_frequency(hz)
-                break
-            except PermissionError:
-                continue
-
-
-    def is_overlay_loaded(self) -> bool:
-        return os.path.isdir(self.chippath)
-
-    def is_export_writable(self) -> bool:
-        return os.access(os.path.join(self.chippath, "export"), os.W_OK)
-
-    def does_pwmX_exists(self) -> bool:
-        return os.path.isdir(self.pwm_dir)
-
-    def echo(self, message: int, file: str) -> None:
-        
-        rospy.loginfo(f"{message, file}")
-        print(f"{message, file}")
-        with open(file, "w") as f:
-            f.write(f"{message}\n")
-
-    def create_pwmX(self) -> None:
-        print("Creating {pwm_channel}")
-        self.echo(self.pwm_channel, os.path.join(self.chippath, "export"))
-        print(f"creating success? {self.does_pwmX_exists()}")
-
-    def start(self, initial_duty_cycle: float) -> None:
-        self.change_duty_cycle(initial_duty_cycle)
-        self.echo(1, os.path.join(self.pwm_dir, "enable"))
-
-    def stop(self) -> None:
-        self.change_duty_cycle(0)
-        self.echo(0, os.path.join(self.pwm_dir, "enable"))
-
-    def change_duty_cycle(self, duty_cycle: float) -> None:
-        """
-        a value between 0 and 100
-        0 represents always low.
-        100 represents always high.
-        """
-        if not (0 <= duty_cycle <= 100):
-            raise HardwarePWMException("Duty cycle must be between 0 and 100 (inclusive).")
-        self._duty_cycle = duty_cycle
-        per = 1 / float(self._hz)
-        per *= 1000  # now in milliseconds
-        per *= 1_000_000  # now in nanoseconds
-        dc = int(per * duty_cycle / 100)
-        self.echo(dc, os.path.join(self.pwm_dir, "duty_cycle"))
-
-    def change_frequency(self, hz: float) -> None:
-        if hz < 0.1:
-            raise HardwarePWMException("Frequency can't be lower than 0.1 on the Rpi.")
-
-        self._hz = hz
-
-        # we first have to change duty cycle, since https://stackoverflow.com/a/23050835/1895939
-        original_duty_cycle = self._duty_cycle
-        if self._duty_cycle:
-            self.change_duty_cycle(0)
-
-        per = 1 / float(self._hz)
-        per *= 1000  # now in milliseconds
-        per *= 1_000_000  # now in nanoseconds
-        self.echo(int(per), os.path.join(self.pwm_dir, "period"))
-
-        self.change_duty_cycle(original_duty_cycle)
-
-
+from rpi_hardware_pwm import HardwarePWM, HardwarePWMException
 
 
 import RPi.GPIO as GPIO
@@ -117,9 +16,6 @@ P_SERVO = 12  # adapt to your wiring
 P_ENGINE = 33  # adapt to your wiring
 fPWM = 50
 
-"""
-TODO: Frequenz ändern bei softwarepwm, oder anderes modul nehmen
-"""
 
 class PWMSoftware:
 
